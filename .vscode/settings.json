@@ -1,0 +1,12 @@
+{
+  "liveServer.settings.root": "/frontend",
+  "liveServer.settings.port": 5500,
+  "liveServer.settings.donotShowInfoMsg": true,
+  "files.encoding": "utf8",
+  "files.eol": "\r\n",
+  "editor.tabSize": 2,
+  "editor.formatOnSave": false,
+  "[html]": {
+    "editor.tabSize": 2
+  }
+}

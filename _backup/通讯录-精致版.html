@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>通讯录 · Address Book</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='6'%20fill='%232C6E63'/%3E%3Crect%20x='8'%20y='6'%20width='16'%20height='20'%20rx='2'%20fill='%23F0F1ED'/%3E%3Crect%20x='11'%20y='11'%20width='10'%20height='2'%20fill='%232C6E63'/%3E%3Crect%20x='11'%20y='16'%20width='10'%20height='2'%20fill='%232C6E63'/%3E%3Crect%20x='11'%20y='21'%20width='6'%20height='2'%20fill='%23A8763A'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --paper:#F0F1ED;
+  --panel:#FFFFFF;
+  --ink:#141A17;
+  --ink-2:#4E5852;
+  --ink-3:#8A938D;
+  --line:#E2E4DE;
+  --line-2:#EDEEE9;
+  --accent:#2C6E63;
+  --accent-soft:#E4EFEB;
+  --brass:#A8763A;
+  --danger:#A6432F;
+  --serif:"Noto Serif SC","Songti SC","SimSun",serif;
+  --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--sans);
+  color:var(--ink);
+  background:var(--paper);
+  -webkit-font-smoothing:antialiased;
+  font-size:14px;
+  line-height:1.55;
+  overflow:hidden;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;border:0;background:none}
+input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#D3D6CF;border-radius:6px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#BFC3BB;background-clip:content-box}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ============ 布局 ============ */
+.app{display:grid;grid-template-columns:232px 372px 1fr;height:100vh;height:100dvh}
+
+/* ============ 左侧索引栏 ============ */
+.rail{
+  background:var(--paper);
+  border-right:1px solid var(--line);
+  display:flex;flex-direction:column;
+  padding:22px 16px 16px;gap:22px;
+}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand-mark{display:flex;align-items:center;gap:9px}
+.brand-mark svg{width:22px;height:22px;flex:none}
+.brand h1{
+  font-family:var(--serif);font-weight:700;font-size:19px;letter-spacing:.06em;
+  margin:0;line-height:1.2;
+}
+.brand p{margin:0;font-size:11px;letter-spacing:.14em;color:var(--ink-3);text-transform:uppercase}
+
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 10px;border-radius:7px;text-align:left;width:100%;
+  color:var(--ink-2);transition:background .15s,color .15s;
+}
+.nav-item:hover{background:#E8EAE4}
+.nav-item[aria-current="true"]{background:var(--accent);color:#fff}
+.nav-item[aria-current="true"] .nav-count{color:rgba(255,255,255,.8)}
+.nav-count{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.io-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 10px;border:1px solid var(--line);border-radius:7px;
+  background:#F7F8F5;color:var(--ink-2);text-align:left;
+  transition:border-color .15s,background .15s;
+}
+.io-btn:hover{border-color:#C9CDC4;background:#fff;color:var(--ink)}
+.io-btn svg{width:15px;height:15px;flex:none}
+.note{font-size:11px;color:var(--ink-3);line-height:1.5;margin:4px 2px 0}
+
+/* ============ 中间列表 ============ */
+.listcol{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.listhead{padding:16px 16px 10px;border-bottom:1px solid var(--line-2)}
+.headline{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:12px}
+.headline h2{font-family:var(--serif);font-weight:500;font-size:15px;margin:0;letter-spacing:.04em}
+.headline span{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.searchrow{display:flex;gap:8px}
+.search{position:relative;flex:1;min-width:0}
+.search svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-3)}
+.search input{
+  width:100%;padding:8px 10px 8px 30px;border:1px solid var(--line);border-radius:8px;
+  background:#FAFBF8;outline:none;transition:border-color .15s,background .15s;
+}
+.search input:focus{border-color:var(--accent);background:#fff}
+.search input::placeholder{color:#A8B0AA}
+.add-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;
+  padding:8px 12px;border-radius:8px;background:var(--accent);color:#fff;
+  transition:background .15s;
+}
+.add-btn:hover{background:#245a51}
+.add-btn svg{width:14px;height:14px}
+
+.list{overflow-y:auto;flex:1;padding:6px}
+.row{
+  display:grid;grid-template-columns:36px 1fr 18px;gap:10px;align-items:center;
+  padding:9px 8px;border-radius:8px;width:100%;text-align:left;
+  transition:background .12s;
+}
+.row:hover{background:#F5F6F2}
+.row[aria-selected="true"]{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.ava{
+  width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:15px;color:#fff;flex:none;user-select:none;
+}
+.row-main{min-width:0}
+.row-name{font-weight:500;display:flex;align-items:center;gap:6px}
+.row-name b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-sub{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pin{width:15px;height:15px;color:var(--brass);flex:none}
+.blank{opacity:0;width:15px;height:15px}
+.empty-list{padding:36px 20px;text-align:center;color:var(--ink-3);font-size:12.5px;line-height:1.7}
+
+/* ============ 右侧详情 ============ */
+.detail{background:var(--paper);overflow-y:auto;position:relative}
+.detail-empty{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:40px;text-align:center;color:var(--ink-3);
+}
+.detail-empty .glyph{font-family:var(--serif);font-size:56px;line-height:1;color:#C9CEC6;letter-spacing:.1em}
+.detail-empty p{margin:0;font-size:13px;max-width:260px;line-height:1.7}
+.detail-body{padding:28px 32px 56px;max-width:720px}
+
+.dhead{display:flex;align-items:flex-start;gap:18px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.ava-lg{
+  width:66px;height:66px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:27px;color:#fff;flex:none;
+}
+.dhead-main{min-width:0;flex:1}
+.dname{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dname h3{font-family:var(--serif);font-weight:700;font-size:25px;margin:0;letter-spacing:.04em;line-height:1.25;word-break:break-word}
+.dorg{font-size:12.5px;color:var(--ink-3);margin-top:3px}
+.fav-btn{
+  display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;
+  border:1px solid var(--line);font-size:12px;color:var(--ink-3);background:#F7F8F5;
+  transition:all .15s;
+}
+.fav-btn svg{width:13px;height:13px}
+.fav-btn:hover{border-color:var(--brass);color:var(--brass)}
+.fav-btn[data-on="true"]{border-color:var(--brass);color:var(--brass);background:#FBF4E8}
+
+.actions{display:flex;gap:8px;flex:none;margin-left:auto}
+.icon-btn{
+  width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:#F7F8F5;
+  display:inline-flex;align-items:center;justify-content:center;color:var(--ink-2);
+  transition:all .15s;
+}
+.icon-btn svg{width:15px;height:15px}
+.icon-btn:hover{background:#fff;border-color:#C9CDC4;color:var(--ink)}
+.icon-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:#FCF1EE}
+
+.sec{margin-top:26px}
+.sec h4{
+  margin:0 0 10px;font-size:11px;letter-spacing:.14em;color:var(--ink-3);
+  font-weight:500;text-transform:uppercase;
+}
+.mlist{display:flex;flex-direction:column;gap:1px;background:var(--line-2);border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
+.mrow{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:center;padding:11px 13px;background:#FCFCFA}
+.mrow:hover{background:#fff}
+.mico{width:28px;height:28px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center}
+.mico svg{width:14px;height:14px}
+.mval{min-width:0}
+.mtype{font-size:10.5px;color:var(--ink-3);letter-spacing:.08em}
+.mnum{font-size:14px;word-break:break-all;font-variant-numeric:tabular-nums}
+.note-box{background:#FCFCFA;border:1px solid var(--line-2);border-radius:9px;padding:13px 15px;font-size:13px;color:var(--ink-2);line-height:1.75;white-space:pre-wrap;word-break:break-word;min-height:52px}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:11.5px;color:var(--ink-3);margin-top:26px;padding-top:16px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+
+/* ============ 编辑表单（模态） ============ */
+.scrim{
+  position:fixed;inset:0;background:rgba(20,26,23,.34);z-index:40;
+  display:none;align-items:center;justify-content:center;padding:24px;
+}
+.scrim[data-open="true"]{display:flex}
+.sheet{
+  background:var(--panel);border-radius:14px;width:100%;max-width:580px;
+  max-height:min(88vh,760px);display:flex;flex-direction:column;
+  box-shadow:0 18px 50px -20px rgba(20,26,23,.45);
+  animation:sheetIn .18s ease-out;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line-2)}
+.sheet-head h3{margin:0;font-family:var(--serif);font-weight:700;font-size:16px;letter-spacing:.04em}
+.sheet-body{padding:18px;overflow-y:auto;flex:1}
+.sheet-foot{padding:14px 18px;border-top:1px solid var(--line-2);display:flex;justify-content:flex-end;gap:9px;background:#FBFCFA;border-radius:0 0 14px 14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--ink-3);margin-bottom:5px;letter-spacing:.03em}
+.field input,.field textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#FAFBF8;outline:none;
+  transition:border-color .15s,background .15s;
+}
+.field input:focus,.field textarea:focus{border-color:var(--accent);background:#fff}
+.field textarea{resize:vertical;min-height:76px;line-height:1.65}
+.field.err input{border-color:var(--danger);background:#FDF6F4}
+.hint{font-size:11.5px;color:var(--danger);margin-top:4px;display:none}
+.field.err .hint{display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.methods-head{display:flex;align-items:center;justify-content:space-between;margin:20px 0 8px}
+.methods-head h4{margin:0;font-size:12px;color:var(--ink-2);font-weight:500}
+.mini-btn{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--accent);padding:4px 8px;border-radius:6px}
+.mini-btn:hover{background:var(--accent-soft)}
+.mini-btn svg{width:12px;height:12px}
+.mrow-edit{display:grid;grid-template-columns:104px 1fr 30px;gap:8px;margin-bottom:8px}
+.mrow-edit select,.mrow-edit input{padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:#FAFBF8;outline:none;width:100%}
+.mrow-edit select:focus,.mrow-edit input:focus{border-color:var(--accent);background:#fff}
+.delrow{width:30px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--ink-3)}
+.delrow:hover{background:#FCF1EE;color:var(--danger)}
+.delrow svg{width:13px;height:13px}
+.btn-ghost{padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+.btn-ghost:hover{border-color:#C9CDC4;color:var(--ink)}
+.btn-primary{padding:8px 18px;border-radius:8px;background:var(--accent);color:#fff}
+.btn-primary:hover{background:#245a51}
+
+/* ============ toast ============ */
+.toast-wrap{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{
+  background:#1C2421;color:#F2F3EF;padding:10px 16px;border-radius:9px;font-size:13px;
+  box-shadow:0 10px 30px -12px rgba(0,0,0,.5);max-width:88vw;
+  animation:toastIn .2s ease-out;
+}
+.toast[data-kind="warn"]{background:#6B4A2C}
+.toast[data-kind="err"]{background:#6E2C1F}
+@keyframes toastIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ============ 响应式 ============ */
+.mobile-back{display:none}
+@media (max-width:1180px){
+  .app{grid-template-columns:214px 320px 1fr}
+  .detail-body{padding:22px 24px 48px}
+}
+@media (max-width:960px){
+  body{overflow-x:hidden;overflow-y:auto;font-size:15px}
+  .app{grid-template-columns:1fr;height:auto;min-height:100dvh}
+  .rail{
+    position:sticky;top:0;z-index:20;flex-direction:row;align-items:center;gap:10px;
+    padding:10px 12px;border-right:0;border-bottom:1px solid var(--line);flex-wrap:wrap;
+  }
+  .brand{flex:1;min-width:0}
+  .brand h1{font-size:17px}
+  .brand p{display:none}
+  .nav{flex-direction:row;gap:7px;order:3;width:100%}
+  .nav-item{width:auto;padding:9px 13px;min-height:42px;border:1px solid var(--line);background:#fff;font-size:14px}
+  .nav-item[aria-current="true"]{border-color:var(--accent)}
+  .rail-foot{margin-top:0;flex-direction:row;gap:7px}
+  .io-btn{padding:9px 11px;min-width:44px;min-height:42px;font-size:13px}
+  .io-btn svg{width:17px;height:17px}
+  .io-btn span{display:none}
+  .note{display:none}
+  .listcol{border-right:0;min-height:calc(100dvh - 122px)}
+  .add-btn{min-height:42px}
+  .row{padding:11px 8px}
+  .row-sub{font-size:13px}
+  input,textarea,select{font-size:16px}
+}
+@media (max-width:960px){
+  .detail{
+    position:fixed;inset:0;z-index:30;transform:translateX(100%);
+    transition:transform .22s ease-out,visibility .22s;display:flex;flex-direction:column;
+    visibility:hidden;
+  }
+  .detail[data-open="true"]{transform:none;visibility:visible}
+  .mobile-back{
+    display:flex;align-items:center;gap:6px;padding:14px 16px;min-height:48px;
+    border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:2;
+    font-size:14px;color:var(--ink-2);
+  }
+  .mobile-back svg{width:17px;height:17px}
+  .detail-body{padding:18px 18px 48px;max-width:none}
+  .dhead{flex-wrap:wrap}
+  .actions{margin-left:0;width:100%;justify-content:flex-end}
+  .icon-btn{width:42px;height:42px}
+  .sheet{max-height:92dvh;border-radius:14px 14px 0 0;max-width:none}
+  .scrim{padding:0;align-items:flex-end}
+  .grid2{grid-template-columns:1fr}
+  .mrow-edit{grid-template-columns:92px 1fr 34px}
+  .delrow{width:34px;height:38px}
+  .note-box{font-size:14px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== 左侧索引栏 ===== -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2C6E63" stroke-width="1.6" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="18" rx="2.5"/>
+          <path d="M8 8h8M8 12h8M8 16h4" stroke-width="1.4"/>
+          <path d="M4 8h-1.5M4 12h-1.5M4 16h-1.5" stroke-width="1.2" opacity=".6"/>
+        </svg>
+        <h1>通讯录</h1>
+      </div>
+      <p>Address Book</p>
+    </div>
+
+    <nav class="nav" aria-label="视图切换">
+      <button class="nav-item" data-filter="all" aria-current="true">
+        <span>全部联系人</span><span class="nav-count" id="count-all">0</span>
+      </button>
+      <button class="nav-item" data-filter="fav">
+        <span>收藏</span><span class="nav-count" id="count-fav">0</span>
+      </button>
+    </nav>
+
+    <div class="rail-foot">
+      <button class="io-btn" id="btn-export">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5 5 5-5"/><path d="M12 14V3"/>
+        </svg>
+        <span>导出 Excel</span>
+      </button>
+      <button class="io-btn" id="btn-import">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>
+        </svg>
+        <span>导入 Excel</span>
+      </button>
+      <p class="note">数据保存在本机浏览器，换设备请用导出／导入迁移。</p>
+    </div>
+  </aside>
+
+  <!-- ===== 中间列表 ===== -->
+  <section class="listcol">
+    <div class="listhead">
+      <div class="headline">
+        <h2 id="list-title">全部联系人</h2>
+        <span id="list-sub">0 位</span>
+      </div>
+      <div class="searchrow">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/>
+          </svg>
+          <input id="search" type="search" placeholder="搜索姓名、单位、电话" aria-label="搜索联系人">
+        </div>
+        <button class="add-btn" id="btn-add">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          新增
+        </button>
+      </div>
+    </div>
+    <div class="list" id="list" role="listbox" aria-label="联系人列表"></div>
+  </section>
+
+  <!-- ===== 右侧详情 ===== -->
+  <section class="detail" id="detail">
+    <button class="mobile-back" id="btn-back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      返回列表
+    </button>
+    <div id="detail-inner"></div>
+  </section>
+</div>
+
+<!-- ===== 新增／编辑表单 ===== -->
+<div class="scrim" id="scrim" data-open="false">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="sheet-head">
+      <h3 id="sheet-title">新建联系人</h3>
+      <button class="icon-btn" id="btn-close" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="field" id="f-name">
+        <label for="in-name">姓名 <span style="color:var(--danger)">*</span></label>
+        <input id="in-name" type="text" placeholder="例如：张伟" autocomplete="off" maxlength="40">
+        <div class="hint">请填写姓名</div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="in-org">单位／部门</label>
+          <input id="in-org" type="text" placeholder="例如：福州大学 · 电子信息" autocomplete="off" maxlength="60">
+        </div>
+        <div class="field">
+          <label for="in-note">备注</label>
+          <input id="in-note" type="text" placeholder="一句话描述" autocomplete="off" maxlength="80">
+        </div>
+      </div>
+
+      <div class="methods-head">
+        <h4>联系方式（可添加多个）</h4>
+        <button class="mini-btn" id="btn-add-method" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          添加一条
+        </button>
+      </div>
+      <div id="methods-box"></div>
+      <div class="hint" id="f-method-hint" style="margin-top:2px">至少填写一条联系方式</div>
+
+      <div class="field" style="margin-top:14px">
+        <label for="in-memo">详细说明</label>
+        <textarea id="in-memo" placeholder="认识经过、通信偏好、地址补充等" maxlength="500"></textarea>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn-ghost" id="btn-cancel">取消</button>
+      <button class="btn-primary" id="btn-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".xlsx,.xls,.csv" hidden>
+<div class="toast-wrap" id="toasts"></div>
+<script>
+(function () {
+'use strict';
+
+var KEY = 'xp.addressbook.v1';
+var TYPES = { phone: '电话', email: '邮箱', social: '社交账号', address: '地址', other: '其他' };
+var AVA = ['#2C6E63', '#3F5A78', '#7A5B3A', '#4E6B4A', '#8A5A52', '#46595E'];
+var HEADERS = ['姓名', '单位', '收藏', '备注', '电话1', '电话2', '电话3', '邮箱1', '邮箱2', '社交1', '社交2', '地址'];
+
+var ICONS = {
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1-8.7 2 2 0 0 1 2-1.7h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7A2 2 0 0 1 22 16.9z"/>',
+  email: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/>',
+  social: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/>',
+  address: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  other: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+  star: '<path d="M12 3l2.9 5.9 6.1.9-4.5 4.4 1.1 6.1L12 17.6 6.4 20.3l1.1-6.1L3 9.8l6.1-.9L12 3z"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>'
+};
+function ico(name) {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>';
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function uid() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+function avatarColor(name) { return AVA[hash(name) % AVA.length]; }
+function avatarText(name) {
+  if (!name) return '?';
+  var ch = name.trim().charAt(0);
+  return /[a-zA-Z]/.test(ch) ? ch.toUpperCase() : ch;
+}
+function stamp() {
+  var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+}
+function fmtTime(ts) {
+  if (!ts) return '—';
+  var d = new Date(ts), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/* ===================== 数据层 ===================== */
+var store = { contacts: [] };
+var ui = { filter: 'all', query: '', selectedId: null, editingId: null };
+
+function seed() {
+  var t = Date.now();
+  return [
+    { id: 'c-seed-1', name: '陈默', org: '福州大学 · 电子信息工程', note: '同组，嵌入式', memo: '实验室 3 号楼 402。', favorite: true, createdAt: t - 86400000 * 40, updatedAt: t - 3600000 * 5,
+      methods: [{ type: 'phone', value: '138 0013 8000' }, { type: 'email', value: 'chenmo@example.com' }, { type: 'social', value: '微信：chenmo_fzu' }] },
+    { id: 'c-seed-2', name: '林小满', org: '梅努斯国际工程学院', note: '设计课搭档', memo: '', favorite: true, createdAt: t - 86400000 * 30, updatedAt: t - 86400000 * 2,
+      methods: [{ type: 'phone', value: '135 2233 6677' }, { type: 'email', value: 'linxm@example.com' }] },
+    { id: 'c-seed-3', name: '张伟', org: '华威电子有限公司', note: 'PLC 供应商', memo: '下单走邮件，抄送采购。', favorite: false, createdAt: t - 86400000 * 20, updatedAt: t - 86400000 * 1,
+      methods: [{ type: 'phone', value: '021-6688 9000' }, { type: 'email', value: 'zhangwei@huawei-elec.com' }, { type: 'address', value: '上海市闵行区景联路 188 号 3 栋' }] },
+    { id: 'c-seed-4', name: '黄婧', org: '福州大学 · 教务处', note: '', memo: '成绩单盖章找她，周二、周四在。', favorite: false, createdAt: t - 86400000 * 14, updatedAt: t - 86400000 * 3,
+      methods: [{ type: 'phone', value: '0591-2286 6521' }, { type: 'email', value: 'huangj@fzu.edu.cn' }] },
+    { id: 'c-seed-5', name: '郑一鸣', org: '2026 级辅导员', note: '请假、评奖', memo: '', favorite: false, createdAt: t - 86400000 * 10, updatedAt: t - 86400000 * 6,
+      methods: [{ type: 'phone', value: '139 5566 1188' }, { type: 'social', value: '微信：zym_fzu' }] },
+    { id: 'c-seed-6', name: '苏然', org: '华为 · 技术支持', note: '云服务器部署咨询', memo: '工单号在邮件里。', favorite: false, createdAt: t - 86400000 * 6, updatedAt: t - 3600000 * 30,
+      methods: [{ type: 'phone', value: '400-822-9999' }, { type: 'email', value: 'su.ran@example.com' }] }
+  ];
+}
+
+function load() {
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p && Array.isArray(p.contacts)) { store = p; return; }
+    }
+  } catch (e) { /* 存储损坏则回到初始数据 */ }
+  store = { contacts: seed() };
+  save();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(store)); }
+  catch (e) { toast('本机存储写入失败，本次修改不会保存', 'err'); }
+}
+function find(id) {
+  for (var i = 0; i < store.contacts.length; i++) if (store.contacts[i].id === id) return store.contacts[i];
+  return null;
+}
+function sorted(list) {
+  return list.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'); });
+}
+function visible() {
+  var q = ui.query.trim().toLowerCase();
+  var list = store.contacts.filter(function (c) {
+    if (ui.filter === 'fav' && !c.favorite) return false;
+    if (!q) return true;
+    var hay = [c.name, c.org, c.note, c.memo].join(' ') + ' ' + (c.methods || []).map(function (m) { return m.value; }).join(' ');
+    return hay.toLowerCase().indexOf(q) > -1;
+  });
+  return sorted(list);
+}
+function firstMethod(c) {
+  var ms = c.methods || [];
+  for (var i = 0; i < ms.length; i++) if (ms[i].value) return ms[i];
+  return null;
+}
+
+/* ===================== 渲染 ===================== */
+var $list = document.getElementById('list');
+var $detail = document.getElementById('detail');
+var $detailInner = document.getElementById('detail-inner');
+
+function render() {
+  var favCount = store.contacts.filter(function (c) { return c.favorite; }).length;
+  document.getElementById('count-all').textContent = store.contacts.length;
+  document.getElementById('count-fav').textContent = favCount;
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) {
+    b.setAttribute('aria-current', b.dataset.filter === ui.filter ? 'true' : 'false');
+  });
+
+  var vis = visible();
+  document.getElementById('list-title').textContent = ui.filter === 'fav' ? '收藏' : (ui.query ? '搜索结果' : '全部联系人');
+  document.getElementById('list-sub').textContent = vis.length + ' 位';
+
+  if (!vis.length) {
+    $list.innerHTML = '<div class="empty-list">' +
+      (ui.query ? '没有匹配「' + esc(ui.query) + '」的联系人。<br>换个关键词试试。'
+        : ui.filter === 'fav' ? '还没有收藏的联系人。<br>在详情页点击「收藏」即可标记。'
+          : '通讯录是空的。<br>点「新增」或在左侧导入 Excel。') + '</div>';
+  } else {
+    $list.innerHTML = vis.map(function (c) {
+      var fm = firstMethod(c);
+      var sub = fm ? (TYPES[fm.type] + ' · ' + fm.value) : '暂无联系方式';
+      return '<div class="row" role="option" tabindex="0" data-id="' + c.id + '" aria-selected="' + (c.id === ui.selectedId ? 'true' : 'false') + '">' +
+        '<div class="ava" style="background:' + avatarColor(c.name) + '">' + esc(avatarText(c.name)) + '</div>' +
+        '<div class="row-main"><div class="row-name"><b>' + esc(c.name) + '</b>' +
+        (c.favorite ? '<svg class="pin" viewBox="0 0 24 24" fill="' + 'currentColor' + '" stroke="none" style="color:var(--brass)">' + ICONS.star + '</svg>' : '') +
+        '</div><div class="row-sub">' + esc(sub) + '</div></div>' +
+        '<span></span></div>';
+    }).join('');
+  }
+
+  renderDetail();
+}
+
+function renderDetail() {
+  var c = ui.selectedId ? find(ui.selectedId) : null;
+  if (!c) {
+    $detail.removeAttribute('data-open');
+    $detailInner.innerHTML = '<div class="detail-empty"><div class="glyph">Aa</div>' +
+      '<p>从左侧选择一位联系人查看详情，或点「新增」建立一条记录。</p></div>';
+    return;
+  }
+  $detail.setAttribute('data-open', 'true');
+
+  var methods = (c.methods || []).map(function (m) {
+    var t = TYPES[m.type] ? m.type : 'other';
+    return '<div class="mrow" data-copy="' + esc(m.value) + '" title="点击复制">' +
+      '<div class="mico">' + ico(t) + '</div>' +
+      '<div class="mval"><div class="mtype">' + TYPES[t] + '</div><div class="mnum">' + esc(m.value) + '</div></div></div>';
+  }).join('') || '<div class="mrow"><div class="mval" style="color:var(--ink-3)">暂无联系方式</div></div>';
+
+  $detailInner.innerHTML =
+    '<div class="detail-body">' +
+    '<div class="dhead">' +
+      '<div class="ava-lg" style="background:' + avatarColor(c.name) + '">' + esc(avatarText(c.name)) + '</div>' +
+      '<div class="dhead-main">' +
+        '<div class="dname"><h3>' + esc(c.name) + '</h3>' +
+          '<button class="fav-btn" id="btn-fav" data-on="' + (c.favorite ? 'true' : 'false') + '">' +
+          '<svg viewBox="0 0 24 24" fill="' + (c.favorite ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">' + ICONS.star + '</svg>' +
+          (c.favorite ? '已收藏' : '收藏') + '</button>' +
+        '</div>' +
+        '<div class="dorg">' + esc(c.org || '未填写单位') + (c.note ? ' · ' + esc(c.note) : '') + '</div>' +
+      '</div>' +
+      '<div class="actions">' +
+        '<button class="icon-btn" id="btn-edit" title="编辑" aria-label="编辑">' + ico('edit') + '</button>' +
+        '<button class="icon-btn danger" id="btn-del" title="删除" aria-label="删除">' + ico('trash') + '</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="sec"><h4>联系方式（' + (c.methods || []).length + '）</h4><div class="mlist">' + methods + '</div></div>' +
+    (c.memo ? '<div class="sec"><h4>详细说明</h4><div class="note-box">' + esc(c.memo) + '</div></div>' : '') +
+    '<div class="meta"><span>创建：' + fmtTime(c.createdAt) + '</span><span>更新：' + fmtTime(c.updatedAt) + '</span></div>' +
+    '</div>';
+
+  var favBtn = document.getElementById('btn-fav');
+  if (favBtn) favBtn.addEventListener('click', function () { toggleFav(c.id); });
+  document.getElementById('btn-edit').addEventListener('click', function () { openEditor(c.id); });
+  document.getElementById('btn-del').addEventListener('click', function () { removeContact(c.id); });
+}
+
+/* ===================== 交互 ===================== */
+function select(id) {
+  ui.selectedId = id;
+  render();
+}
+function toggleFav(id) {
+  var c = find(id);
+  if (!c) return;
+  c.favorite = !c.favorite;
+  c.updatedAt = Date.now();
+  save(); render();
+  toast(c.favorite ? '已收藏 ' + c.name : '已取消收藏 ' + c.name);
+}
+function removeContact(id) {
+  var c = find(id);
+  if (!c) return;
+  if (!window.confirm('删除「' + c.name + '」及其全部联系方式？此操作不可撤销。')) return;
+  store.contacts = store.contacts.filter(function (x) { return x.id !== id; });
+  if (ui.selectedId === id) ui.selectedId = null;
+  save(); render();
+  toast('已删除 ' + c.name);
+}
+
+$list.addEventListener('click', function (e) {
+  var row = e.target.closest('.row');
+  if (row) select(row.dataset.id);
+});
+$list.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var row = e.target.closest('.row');
+  if (row) { e.preventDefault(); select(row.dataset.id); }
+});
+$detailInner.addEventListener('click', function (e) {
+  var m = e.target.closest('.mrow');
+  if (!m || !m.dataset.copy) return;
+  copyText(m.dataset.copy);
+});
+function copyText(text) {
+  var done = function () { toast('已复制：' + text); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+  } else { fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败', 'err'); }
+  document.body.removeChild(ta);
+}
+
+Array.prototype.forEach.call(document.querySelectorAll('.nav-item'), function (b) {
+  b.addEventListener('click', function () { ui.filter = b.dataset.filter; render(); });
+});
+document.getElementById('search').addEventListener('input', function (e) {
+  ui.query = e.target.value; render();
+});
+document.getElementById('btn-back').addEventListener('click', function () {
+  $detail.removeAttribute('data-open');
+  ui.selectedId = null;
+  Array.prototype.forEach.call(document.querySelectorAll('.row'), function (r) { r.setAttribute('aria-selected', 'false'); });
+});
+
+/* ===================== 新增 / 编辑表单 ===================== */
+var $scrim = document.getElementById('scrim');
+var $methodsBox = document.getElementById('methods-box');
+var $methodHint = document.getElementById('f-method-hint');
+var $nameField = document.getElementById('f-name');
+
+function methodRow(type, value) {
+  var row = document.createElement('div');
+  row.className = 'mrow-edit';
+  var opts = Object.keys(TYPES).map(function (k) {
+    return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + TYPES[k] + '</option>';
+  }).join('');
+  row.innerHTML =
+    '<select aria-label="联系方式类型">' + opts + '</select>' +
+    '<input type="text" placeholder="号码 / 邮箱 / 账号 / 地址" maxlength="80" aria-label="联系方式内容">' +
+    '<button class="delrow" type="button" aria-label="删除这条">' + ico('x') + '</button>';
+  row.querySelector('input').value = value || '';
+  row.querySelector('.delrow').addEventListener('click', function () {
+    row.remove();
+  });
+  $methodsBox.appendChild(row);
+  return row;
+}
+
+function openEditor(id) {
+  ui.editingId = id || null;
+  var c = id ? find(id) : null;
+  document.getElementById('sheet-title').textContent = c ? '编辑联系人' : '新建联系人';
+  document.getElementById('in-name').value = c ? c.name : '';
+  document.getElementById('in-org').value = c ? (c.org || '') : '';
+  document.getElementById('in-note').value = c ? (c.note || '') : '';
+  document.getElementById('in-memo').value = c ? (c.memo || '') : '';
+  $nameField.classList.remove('err');
+  $methodHint.style.display = 'none';
+  $methodsBox.innerHTML = '';
+  var ms = (c && c.methods && c.methods.length) ? c.methods : [{ type: 'phone', value: '' }, { type: 'email', value: '' }];
+  ms.forEach(function (m) { methodRow(m.type, m.value); });
+  $scrim.dataset.open = 'true';
+  setTimeout(function () { document.getElementById('in-name').focus(); }, 30);
+}
+function closeEditor() { $scrim.dataset.open = 'false'; }
+
+function collect() {
+  var name = document.getElementById('in-name').value.trim();
+  if (!name) {
+    $nameField.classList.add('err');
+    document.getElementById('in-name').focus();
+    return null;
+  }
+  $nameField.classList.remove('err');
+
+  var methods = [];
+  Array.prototype.forEach.call($methodsBox.querySelectorAll('.mrow-edit'), function (r) {
+    var t = r.querySelector('select').value;
+    var v = r.querySelector('input').value.trim();
+    if (v) methods.push({ type: t, value: v });
+  });
+  if (!methods.length) {
+    $methodHint.style.display = 'block';
+    return null;
+  }
+  $methodHint.style.display = 'none';
+
+  return {
+    name: name,
+    org: document.getElementById('in-org').value.trim(),
+    note: document.getElementById('in-note').value.trim(),
+    memo: document.getElementById('in-memo').value.trim(),
+    methods: methods
+  };
+}
+
+document.getElementById('btn-add').addEventListener('click', function () { openEditor(null); });
+document.getElementById('btn-add-method').addEventListener('click', function () { methodRow('phone', ''); });
+document.getElementById('btn-close').addEventListener('click', closeEditor);
+document.getElementById('btn-cancel').addEventListener('click', closeEditor);
+$scrim.addEventListener('click', function (e) { if (e.target === $scrim) closeEditor(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && $scrim.dataset.open === 'true') closeEditor();
+});
+
+document.getElementById('btn-save').addEventListener('click', function () {
+  var data = collect();
+  if (!data) return;
+  var now = Date.now();
+  if (ui.editingId) {
+    var c = find(ui.editingId);
+    if (!c) { closeEditor(); return; }
+    c.name = data.name; c.org = data.org; c.note = data.note; c.memo = data.memo;
+    c.methods = data.methods; c.updatedAt = now;
+    ui.selectedId = c.id;
+    save(); closeEditor(); render();
+    toast('已保存 ' + c.name);
+  } else {
+    var nc = {
+      id: uid(), name: data.name, org: data.org, note: data.note, memo: data.memo,
+      methods: data.methods, favorite: false, createdAt: now, updatedAt: now
+    };
+    store.contacts.push(nc);
+    ui.selectedId = nc.id;
+    save(); closeEditor(); render();
+    toast('已新增 ' + nc.name);
+  }
+});
+
+/* ===================== Excel 导出 ===================== */
+function exportRows() {
+  return sorted(store.contacts).map(function (c) {
+    var bucket = { phone: [], email: [], social: [], address: [], other: [] };
+    (c.methods || []).forEach(function (m) {
+      var t = bucket[m.type] ? m.type : 'other';
+      bucket[t].push(m.value);
+    });
+    var pick = function (arr, n) { return arr.slice(0, n).concat(arr.slice(n).length ? ['其他：' + arr.slice(n).join('；')] : []); };
+    var ph = pick(bucket.phone, 3), em = pick(bucket.email, 2), so = pick(bucket.social, 2);
+    var addr = bucket.address.concat(bucket.other).join('；');
+    return [
+      c.name, c.org || '', c.favorite ? '是' : '否', c.note || '',
+      ph[0] || '', ph[1] || '', ph[2] || '',
+      em[0] || '', em[1] || '',
+      so[0] || '', so[1] || '',
+      addr || ''
+    ];
+  });
+}
+
+document.getElementById('btn-export').addEventListener('click', function () {
+  var contacts = store.contacts;
+  if (!contacts.length) { toast('通讯录为空，没有可导出的内容', 'warn'); return; }
+  var rows = exportRows();
+  var fname = '通讯录_' + stamp();
+
+  if (typeof XLSX !== 'undefined') {
+    var aoa = [HEADERS].concat(rows);
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 7 }, { wch: 20 }, { wch: 17 }, { wch: 17 }, { wch: 17 }, { wch: 26 }, { wch: 26 }, { wch: 18 }, { wch: 18 }, { wch: 32 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '通讯录');
+    XLSX.writeFile(wb, fname + '.xlsx');
+    toast('已导出 ' + rows.length + ' 位联系人为 Excel');
+  } else {
+    var csv = '\ufeff' + [HEADERS].concat(rows).map(function (r) {
+      return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    download(new Blob([csv], { type: 'text/csv;charset=utf-8' }), fname + '.csv');
+    toast('Excel 组件未加载，已改为导出 CSV（可用 Excel 打开）', 'warn');
+  }
+});
+
+function download(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+
+/* ===================== Excel 导入 ===================== */
+var $file = document.getElementById('file-input');
+document.getElementById('btn-import').addEventListener('click', function () {
+  if (typeof XLSX === 'undefined') {
+    toast('Excel 组件未加载（需要联网），请稍后重试', 'err');
+    return;
+  }
+  $file.value = '';
+  $file.click();
+});
+
+$file.addEventListener('change', function () {
+  var f = $file.files && $file.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+      importAoA(aoa);
+    } catch (err) {
+      toast('文件解析失败，请确认是标准 Excel 文件', 'err');
+    }
+  };
+  reader.onerror = function () { toast('文件读取失败', 'err'); };
+  reader.readAsArrayBuffer(f);
+});
+
+function classify(header) {
+  var h = String(header).replace(/\s/g, '').toLowerCase();
+  if (!h) return null;
+  if (/姓名|名字|name/.test(h)) return 'name';
+  if (/单位|公司|部门|org|company/.test(h)) return 'org';
+  if (/收藏|favor/.test(h)) return 'fav';
+  if (/备注|remark|label/.test(h)) return 'note';
+  if (/说明|memo|描述/.test(h)) return 'memo';
+  if (/电话|手机|座机|tel|phone|mobile/.test(h)) return 'phone';
+  if (/邮箱|邮件|email|mail/.test(h)) return 'email';
+  if (/社交|微信|微博|wechat|social|qq/.test(h)) return 'social';
+  if (/地址|住址|address/.test(h)) return 'address';
+  return null;
+}
+
+function importAoA(aoa) {
+  if (!aoa || !aoa.length) { toast('表格是空的，没有可导入的内容', 'warn'); return; }
+  // 找表头行：前 5 行里第一个能识别出「姓名」列的行
+  var hi = -1, cols = null;
+  for (var r = 0; r < Math.min(5, aoa.length); r++) {
+    var map = [];
+    (aoa[r] || []).forEach(function (cell, i) {
+      var k = classify(cell);
+      if (k) map.push({ i: i, k: k });
+    });
+    var hasName = map.some(function (x) { return x.k === 'name'; });
+    if (hasName) { hi = r; cols = map; break; }
+  }
+  if (hi < -1 || !cols) { toast('没找到「姓名」列，请检查表头格式', 'err'); return; }
+
+  var added = 0, skipped = 0, dup = 0, now = Date.now();
+  for (var r2 = hi + 1; r2 < aoa.length; r2++) {
+    var row = aoa[r2] || [];
+    var obj = { methods: [], favorite: false };
+    cols.forEach(function (c) {
+      var v = String(row[c.i] == null ? '' : row[c.i]).trim();
+      if (!v) return;
+      if (c.k === 'name') obj.name = v;
+      else if (c.k === 'org') obj.org = v;
+      else if (c.k === 'note') obj.note = v;
+      else if (c.k === 'memo') obj.memo = v;
+      else if (c.k === 'fav') obj.favorite = /^(是|y|yes|true|1|收藏)$/i.test(v);
+      else obj.methods.push({ type: c.k, value: v });
+    });
+    if (!obj.name) { skipped++; continue; }
+    if (!obj.methods.length) { skipped++; continue; }
+
+    var duplicate = store.contacts.some(function (c) {
+      return c.name === obj.name && (c.methods || []).some(function (m) {
+        return obj.methods.some(function (n) { return n.value === m.value; });
+      });
+    });
+    if (duplicate) { dup++; continue; }
+
+    store.contacts.push({
+      id: uid(), name: obj.name, org: obj.org || '', note: obj.note || '', memo: obj.memo || '',
+      methods: obj.methods, favorite: !!obj.favorite, createdAt: now, updatedAt: now
+    });
+    added++;
+  }
+
+  if (!added && !dup) { toast('没有可导入的有效行：' + skipped + ' 行缺少姓名或联系方式', 'warn'); return; }
+  save(); render();
+  toast('导入完成：新增 ' + added + ' 位' + (dup ? '，跳过 ' + dup + ' 位重复' : '') + (skipped ? '，忽略 ' + skipped + ' 行无效数据' : ''));
+}
+
+/* ===================== toast ===================== */
+function toast(msg, kind) {
+  var box = document.getElementById('toasts');
+  var el = document.createElement('div');
+  el.className = 'toast';
+  if (kind) el.dataset.kind = kind;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(function () {
+    el.style.transition = 'opacity .2s';
+    el.style.opacity = '0';
+    setTimeout(function () { el.remove(); }, 220);
+  }, 2800);
+}
+
+/* ===================== 启动 ===================== */
+load();
+if (window.matchMedia('(min-width: 961px)').matches) {
+  var initList = visible();
+  if (initList.length) ui.selectedId = initList[0].id;
+}
+render();
+})();
+</script>
+</body>
+</html>

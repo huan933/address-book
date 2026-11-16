@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>通讯录</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+body{
+  margin:0;padding:20px;background:#fff;color:#222;
+  font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+.wrap{max-width:760px;margin:0 auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:600}
+.tools{display:flex;gap:6px}
+button{
+  font:inherit;padding:6px 12px;border:1px solid #ccc;background:#f7f7f7;
+  border-radius:4px;cursor:pointer;
+}
+button:hover{background:#eee}
+button.primary{background:#2f6f5e;border-color:#2f6f5e;color:#fff}
+button.primary:hover{background:#28594c}
+
+/* ---- 编辑区 ---- */
+.editor{border:1px solid #dcdcdc;border-radius:6px;padding:14px;margin-bottom:16px;background:#fafafa}
+.editor h2{font-size:14px;margin:0 0 12px;font-weight:600}
+.f{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start}
+.f label{width:74px;flex:none;color:#666;padding-top:6px}
+.f input,.f textarea{
+  flex:1;font:inherit;padding:6px 8px;border:1px solid #ccc;border-radius:4px;width:100%;
+}
+.f textarea{min-height:56px;resize:vertical}
+.f .right{flex:1}
+.actions{justify-content:flex-end;margin-bottom:0}
+
+#methods{flex:1}
+.mrow{display:flex;gap:6px;margin-bottom:6px}
+.mrow select{font:inherit;padding:6px;border:1px solid #ccc;border-radius:4px}
+.mrow input{flex:1;font:inherit;padding:6px 8px;border:1px solid #ccc;border-radius:4px;min-width:0}
+.mrow .del{padding:6px 8px;color:#b03a2e}
+.link{border:0;background:none;color:#2f6f5e;padding:2px 0;font-size:13px}
+
+/* ---- 搜索栏 ---- */
+.bar{display:flex;gap:6px;margin-bottom:12px}
+#search{flex:1;font:inherit;padding:7px 10px;border:1px solid #ccc;border-radius:4px;min-width:0}
+.chip.on{background:#2f6f5e;border-color:#2f6f5e;color:#fff}
+.chip span{opacity:.75}
+
+/* ---- 列表 ---- */
+.list{list-style:none;margin:0;padding:0;border:1px solid #dcdcdc;border-radius:6px;overflow:hidden}
+.item{padding:12px 14px;border-bottom:1px solid #e8e8e8}
+.item:last-child{border-bottom:0}
+.item:hover{background:#fbfbfb}
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.name{font-weight:600}
+.org{color:#777;font-size:13px}
+.ops{margin-left:auto;display:flex;gap:4px}
+.ops button{padding:2px 8px;font-size:12px}
+.star{color:#aaa}
+.star.on{color:#c8892b;border-color:#e0c9a3}
+.m{font-size:13px;color:#444;margin-top:4px}
+.m .t{color:#888;display:inline-block;width:62px}
+.note{font-size:13px;color:#777;margin-top:6px;white-space:pre-wrap}
+.empty{padding:24px 14px;color:#888;text-align:center}
+.tip{color:#888;font-size:12px;margin-top:10px}
+
+/* ---- toast ---- */
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  background:#222;color:#fff;padding:8px 14px;border-radius:4px;font-size:13px;
+  max-width:90vw;z-index:20;
+}
+@media (max-width:560px){
+  body{padding:12px}
+  .f{flex-direction:column;gap:4px}
+  .f label{width:auto;padding-top:0}
+  .tools{width:100%}
+  .tools button{flex:1}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>通讯录</h1>
+    <div class="tools">
+      <button id="btn-import">导入 Excel</button>
+      <button id="btn-export">导出 Excel</button>
+      <button id="btn-add" class="primary">新增</button>
+    </div>
+  </header>
+
+  <!-- 编辑区：新增和修改共用 -->
+  <section class="editor" id="editor" hidden>
+    <h2 id="editor-title">新增联系人</h2>
+    <div class="f"><label>姓名 *</label><input id="in-name" maxlength="40" placeholder="张伟"></div>
+    <div class="f"><label>单位</label><input id="in-org" maxlength="60" placeholder="福州大学"></div>
+    <div class="f"><label>备注</label><input id="in-note" maxlength="80" placeholder="一句话备注"></div>
+    <div class="f"><label>联系方式</label>
+      <div class="right">
+        <div id="methods"></div>
+        <button class="link" id="btn-add-method" type="button">+ 添加一条</button>
+      </div>
+    </div>
+    <div class="f"><label>说明</label><textarea id="in-memo" maxlength="300" placeholder="补充信息（可不填）"></textarea></div>
+    <div class="f actions">
+      <button class="primary" id="btn-save">保存</button>
+      <button id="btn-cancel">取消</button>
+    </div>
+  </section>
+
+  <div class="bar">
+    <input id="search" type="search" placeholder="搜索姓名、单位、电话">
+    <button class="chip on" data-filter="all">全部 <span id="c-all">0</span></button>
+    <button class="chip" data-filter="fav">收藏 <span id="c-fav">0</span></button>
+  </div>
+
+  <ul class="list" id="list"></ul>
+  <p class="tip">共 <span id="c-total">0</span> 位联系人 · 数据保存在本机浏览器</p>
+</div>
+
+<input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+'use strict';
+
+var KEY = 'xp.addressbook.v1';
+var TYPES = { phone: '电话', email: '邮箱', social: '社交', address: '地址', other: '其他' };
+var HEADERS = ['姓名', '单位', '收藏', '备注', '电话1', '电话2', '电话3', '邮箱1', '邮箱2', '社交1', '社交2', '地址'];
+
+var store = { contacts: [] };
+var ui = { filter: 'all', query: '', editingId: null };
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function uid() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function nowStr() {
+  var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+}
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function () { t.hidden = true; }, 2400);
+}
+
+/* ---------- 数据 ---------- */
+function seed() {
+  var t = Date.now();
+  return [
+    { id: 's1', name: '陈默', org: '福州大学 电子信息', note: '同组', memo: '实验室 3 号楼 402。', favorite: true, createdAt: t, updatedAt: t,
+      methods: [{ type: 'phone', value: '138 0013 8000' }, { type: 'email', value: 'chenmo@example.com' }, { type: 'social', value: '微信 chenmo_fzu' }] },
+    { id: 's2', name: '林小满', org: '梅努斯国际工程学院', note: '设计课搭档', memo: '', favorite: true, createdAt: t, updatedAt: t,
+      methods: [{ type: 'phone', value: '135 2233 6677' }, { type: 'email', value: 'linxm@example.com' }] },
+    { id: 's3', name: '张伟', org: '华威电子', note: 'PLC 供应商', memo: '下单走邮件。', favorite: false, createdAt: t, updatedAt: t,
+      methods: [{ type: 'phone', value: '021-6688 9000' }, { type: 'address', value: '上海市闵行区景联路 188 号' }] },
+    { id: 's4', name: '黄婧', org: '福州大学 教务处', note: '', memo: '周二周四在办公室。', favorite: false, createdAt: t, updatedAt: t,
+      methods: [{ type: 'phone', value: '0591-2286 6521' }, { type: 'email', value: 'huangj@fzu.edu.cn' }] },
+    { id: 's5', name: '郑一鸣', org: '2026 级辅导员', note: '请假找他', memo: '', favorite: false, createdAt: t, updatedAt: t,
+      methods: [{ type: 'phone', value: '139 5566 1188' }] }
+  ];
+}
+function load() {
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p && Array.isArray(p.contacts)) { store = p; return; }
+    }
+  } catch (e) {}
+  store = { contacts: seed() };
+  save();
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(store)); }
+  catch (e) { toast('保存失败：浏览器存储不可用'); }
+}
+function find(id) {
+  for (var i = 0; i < store.contacts.length; i++) if (store.contacts[i].id === id) return store.contacts[i];
+  return null;
+}
+function visible() {
+  var q = ui.query.trim().toLowerCase();
+  var list = store.contacts.filter(function (c) {
+    if (ui.filter === 'fav' && !c.favorite) return false;
+    if (!q) return true;
+    var all = [c.name, c.org, c.note, c.memo].join(' ') + ' ' + (c.methods || []).map(function (m) { return m.value; }).join(' ');
+    return all.toLowerCase().indexOf(q) > -1;
+  });
+  return list.sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'); });
+}
+
+/* ---------- 渲染 ---------- */
+function render() {
+  var favCount = store.contacts.filter(function (c) { return c.favorite; }).length;
+  document.getElementById('c-all').textContent = store.contacts.length;
+  document.getElementById('c-fav').textContent = favCount;
+  document.getElementById('c-total').textContent = store.contacts.length;
+  Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (b) {
+    b.className = 'chip' + (b.dataset.filter === ui.filter ? ' on' : '');
+  });
+
+  var vis = visible();
+  document.getElementById('list').innerHTML = vis.length ? vis.map(function (c) {
+    var ms = (c.methods || []).map(function (m) {
+      return '<div class="m"><span class="t">' + (TYPES[m.type] || '其他') + '</span>' + esc(m.value) + '</div>';
+    }).join('');
+    var extra = [c.note, c.memo].filter(Boolean).map(esc).join('　');
+    return '<li class="item" data-id="' + c.id + '">' +
+      '<div class="top">' +
+        '<span class="name">' + esc(c.name) + '</span>' +
+        '<span class="org">' + esc(c.org || '') + '</span>' +
+        '<div class="ops">' +
+          '<button class="star' + (c.favorite ? ' on' : '') + '" data-act="fav">' + (c.favorite ? '已收藏' : '收藏') + '</button>' +
+          '<button data-act="edit">编辑</button>' +
+          '<button data-act="del">删除</button>' +
+        '</div>' +
+      '</div>' + ms + (extra ? '<div class="note">' + extra + '</div>' : '') +
+      '</li>';
+  }).join('') : '<li class="empty">' + (ui.query ? '没有匹配的联系人' : ui.filter === 'fav' ? '还没有收藏的联系人' : '还没有联系人，点右上角「新增」') + '</li>';
+}
+
+/* ---------- 列表操作 ---------- */
+document.getElementById('list').addEventListener('click', function (e) {
+  var btn = e.target.closest('button');
+  if (!btn) return;
+  var li = e.target.closest('.item');
+  if (!li) return;
+  var c = find(li.dataset.id);
+  if (!c) return;
+  var act = btn.dataset.act;
+  if (act === 'fav') {
+    c.favorite = !c.favorite;
+    c.updatedAt = Date.now();
+    save(); render();
+  } else if (act === 'edit') {
+    openEditor(c.id);
+  } else if (act === 'del') {
+    if (!window.confirm('删除「' + c.name + '」及其联系方式？')) return;
+    store.contacts = store.contacts.filter(function (x) { return x.id !== c.id; });
+    save(); render(); toast('已删除');
+  }
+});
+document.getElementById('search').addEventListener('input', function (e) {
+  ui.query = e.target.value; render();
+});
+Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (b) {
+  b.addEventListener('click', function () { ui.filter = b.dataset.filter; render(); });
+});
+
+/* ---------- 编辑 ---------- */
+var $editor = document.getElementById('editor');
+var $methods = document.getElementById('methods');
+
+function methodRow(type, value) {
+  var div = document.createElement('div');
+  div.className = 'mrow';
+  div.innerHTML = '<select>' + Object.keys(TYPES).map(function (k) {
+    return '<option value="' + k + '"' + (k === type ? ' selected' : '') + '>' + TYPES[k] + '</option>';
+  }).join('') + '</select><input maxlength="80" placeholder="号码 / 邮箱 / 账号 / 地址"><button class="del" type="button">删除</button>';
+  div.querySelector('input').value = value || '';
+  div.querySelector('.del').addEventListener('click', function () { div.remove(); });
+  $methods.appendChild(div);
+}
+
+function openEditor(id) {
+  ui.editingId = id || null;
+  var c = id ? find(id) : null;
+  document.getElementById('editor-title').textContent = c ? '编辑联系人' : '新增联系人';
+  document.getElementById('in-name').value = c ? c.name : '';
+  document.getElementById('in-org').value = c ? (c.org || '') : '';
+  document.getElementById('in-note').value = c ? (c.note || '') : '';
+  document.getElementById('in-memo').value = c ? (c.memo || '') : '';
+  $methods.innerHTML = '';
+  var ms = (c && c.methods && c.methods.length) ? c.methods : [{ type: 'phone', value: '' }];
+  ms.forEach(function (m) { methodRow(m.type, m.value); });
+  $editor.hidden = false;
+  window.scrollTo(0, 0);
+}
+function closeEditor() { $editor.hidden = true; ui.editingId = null; }
+
+document.getElementById('btn-add').addEventListener('click', function () { openEditor(null); });
+document.getElementById('btn-cancel').addEventListener('click', closeEditor);
+document.getElementById('btn-add-method').addEventListener('click', function () { methodRow('phone', ''); });
+
+document.getElementById('btn-save').addEventListener('click', function () {
+  var name = document.getElementById('in-name').value.trim();
+  if (!name) { toast('请填写姓名'); document.getElementById('in-name').focus(); return; }
+  var methods = [];
+  Array.prototype.forEach.call($methods.querySelectorAll('.mrow'), function (r) {
+    var v = r.querySelector('input').value.trim();
+    if (v) methods.push({ type: r.querySelector('select').value, value: v });
+  });
+  if (!methods.length) { toast('请至少填一条联系方式'); return; }
+
+  var data = {
+    name: name,
+    org: document.getElementById('in-org').value.trim(),
+    note: document.getElementById('in-note').value.trim(),
+    memo: document.getElementById('in-memo').value.trim(),
+    methods: methods
+  };
+  var now = Date.now();
+  if (ui.editingId) {
+    var c = find(ui.editingId);
+    if (c) {
+      c.name = data.name; c.org = data.org; c.note = data.note; c.memo = data.memo;
+      c.methods = data.methods; c.updatedAt = now;
+    }
+  } else {
+    store.contacts.push({
+      id: uid(), name: data.name, org: data.org, note: data.note, memo: data.memo,
+      methods: data.methods, favorite: false, createdAt: now, updatedAt: now
+    });
+  }
+  save(); closeEditor(); render();
+  toast('已保存');
+});
+
+/* ---------- 导出 ---------- */
+function exportRows() {
+  return store.contacts.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'); }).map(function (c) {
+    var b = { phone: [], email: [], social: [], address: [], other: [] };
+    (c.methods || []).forEach(function (m) { (b[m.type] || b.other).push(m.value); });
+    return [
+      c.name, c.org || '', c.favorite ? '是' : '否', c.note || '',
+      b.phone[0] || '', b.phone[1] || '', b.phone[2] || '',
+      b.email[0] || '', b.email[1] || '',
+      b.social[0] || '', b.social[1] || '',
+      b.address.concat(b.other).join('；')
+    ];
+  });
+}
+document.getElementById('btn-export').addEventListener('click', function () {
+  if (!store.contacts.length) { toast('没有可导出的联系人'); return; }
+  var rows = exportRows();
+  var name = '通讯录_' + nowStr();
+  if (typeof XLSX !== 'undefined') {
+    var ws = XLSX.utils.aoa_to_sheet([HEADERS].concat(rows));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '通讯录');
+    XLSX.writeFile(wb, name + '.xlsx');
+    toast('已导出 ' + rows.length + ' 位');
+  } else {
+    var csv = '\ufeff' + [HEADERS].concat(rows).map(function (r) {
+      return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\r\n');
+    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.csv';
+    a.click();
+    toast('未联网，已改为导出 CSV');
+  }
+});
+
+/* ---------- 导入 ---------- */
+document.getElementById('btn-import').addEventListener('click', function () {
+  if (typeof XLSX === 'undefined') { toast('Excel 组件未加载，需要联网'); return; }
+  var f = document.getElementById('file');
+  f.value = ''; f.click();
+});
+document.getElementById('file').addEventListener('change', function (e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+      var aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+      importRows(aoa);
+    } catch (err) { toast('解析失败，请确认是 Excel 文件'); }
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+function classify(h) {
+  h = String(h).replace(/\s/g, '').toLowerCase();
+  if (!h) return null;
+  if (/姓名|名字|name/.test(h)) return 'name';
+  if (/单位|公司|部门|org|company/.test(h)) return 'org';
+  if (/收藏|favor/.test(h)) return 'fav';
+  if (/备注/.test(h)) return 'note';
+  if (/说明|memo/.test(h)) return 'memo';
+  if (/电话|手机|tel|phone/.test(h)) return 'phone';
+  if (/邮箱|邮件|email|mail/.test(h)) return 'email';
+  if (/社交|微信|wechat|social/.test(h)) return 'social';
+  if (/地址|address/.test(h)) return 'address';
+  return null;
+}
+
+function importRows(aoa) {
+  var hi = -1, cols = null;
+  for (var r = 0; r < Math.min(5, aoa.length); r++) {
+    var map = [];
+    (aoa[r] || []).forEach(function (cell, i) {
+      var k = classify(cell);
+      if (k) map.push({ i: i, k: k });
+    });
+    if (map.some(function (x) { return x.k === 'name'; })) { hi = r; cols = map; break; }
+  }
+  if (!cols) { toast('没找到「姓名」列'); return; }
+
+  var added = 0, bad = 0, dup = 0, now = Date.now();
+  for (var r2 = hi + 1; r2 < aoa.length; r2++) {
+    var row = aoa[r2] || [], o = { methods: [], favorite: false };
+    cols.forEach(function (col) {
+      var v = String(row[col.i] == null ? '' : row[col.i]).trim();
+      if (!v) return;
+      if (col.k === 'name') o.name = v;
+      else if (col.k === 'org') o.org = v;
+      else if (col.k === 'note') o.note = v;
+      else if (col.k === 'memo') o.memo = v;
+      else if (col.k === 'fav') o.favorite = /是|y|yes|true|1/.test(v);
+      else o.methods.push({ type: col.k, value: v });
+    });
+    if (!o.name || !o.methods.length) { bad++; continue; }
+    if (store.contacts.some(function (c) { return c.name === o.name; })) { dup++; continue; }
+    store.contacts.push({
+      id: uid(), name: o.name, org: o.org || '', note: o.note || '', memo: o.memo || '',
+      methods: o.methods, favorite: o.favorite, createdAt: now, updatedAt: now
+    });
+    added++;
+  }
+  save(); render();
+  toast('导入完成：新增 ' + added + (dup ? '，重名跳过 ' + dup : '') + (bad ? '，无效 ' + bad : ''));
+}
+
+load();
+render();
+})();
+</script>
+</body>
+</html>

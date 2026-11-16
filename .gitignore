@@ -1,0 +1,38 @@
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VS Code（保留 .vscode/settings.json，其余忽略）
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Python 后端
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Node / 前端依赖
+node_modules/
+dist/
+.vite/
+
+# Java 后端
+target/
+*.class
+*.jar
+!.gradle/wrapper/gradle-wrapper.jar
+
+# 运行产物
+*.log
+导出*.xlsx
+导出*.csv
+通讯录_*.xlsx
+通讯录_*.csv
+
+# 自检截图等过程文件
+_shots/
