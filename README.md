@@ -21,7 +21,7 @@ address-book/
 **方式二（最省事）**：直接双击 `frontend/通讯录.html`，无需安装、无需构建、无需启动服务器。
 
 - 数据保存在浏览器 localStorage（key: `xp.addressbook.v1`），刷新不丢；
-- 首次打开会自动写入 6 条示例联系人，可随时删除；
+- 首次打开会自动写入 5 条示例联系人，可随时删除；
 - Excel 导入导出依赖 SheetJS（CDN 加载），需要联网。断网时导出会自动降级为 CSV（Excel 可直接打开）。
 
 ## 已实现功能（对照评分点）
@@ -81,6 +81,11 @@ address-book/
 - `README.md` —— 本说明
 - `.vscode/settings.json` —— Live Server 根目录、编码等配置
 - `.gitignore` —— 已排除依赖目录、构建产物、导出的 Excel、自检截图
+## 相关文档
+
+- 作业博客：[docs/极限编程作业博客.md](docs/极限编程作业博客.md)
+- 代码规范：[docs/code-style.md](docs/code-style.md)
+
 ## 在线访问（GitHub Pages）
 
 已部署到 GitHub Pages，可直接打开：
