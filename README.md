@@ -7,7 +7,7 @@
 ```
 address-book/
 ├── frontend/通讯录.html     前端（单文件，HTML + 内联 CSS/JS）
-├── backend/                后端代码（待开发）
+├── backend/                Spring Boot 后端（Java 17 + JPA + H2 + POI）
 ├── docs/                   截图、演示视频（占位）
 ├── .vscode/                VS Code 配置（Live Server 根目录指向 frontend）
 ├── .gitignore
